@@ -25,6 +25,8 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
+    has_error = False
+
     # Tokenize the file contents
     for char in file_contents:
         if char == '(':
@@ -47,8 +49,17 @@ def main():
             print("SEMICOLON ; null")
         elif char == '*':
             print("STAR * null")
+        elif char in ' \t\r\n':
+            pass
+        else:
+            print(f"[line 1] Error: Unexpected character: {char}", file=sys.stderr)
+            has_error = True
 
     print("EOF  null")
+
+    # Exit with code 65 if there were errors
+    if has_error:
+        exit(65)
 
 if __name__ == "__main__":
     main()
