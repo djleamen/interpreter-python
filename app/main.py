@@ -7,6 +7,7 @@ import sys
 
 
 def main():
+    """Main entry point for the interpreter."""
     if len(sys.argv) < 3:
         print("Usage: ./your_program.sh tokenize <filename>", file=sys.stderr)
         exit(1)
@@ -30,6 +31,10 @@ def main():
             print("LEFT_PAREN ( null")
         elif char == ')':
             print("RIGHT_PAREN ) null")
+        elif char == '{':
+            print("LEFT_BRACE { null")
+        elif char == '}':
+            print("RIGHT_BRACE } null")
 
     print("EOF  null")
 
