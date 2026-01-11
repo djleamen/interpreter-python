@@ -1,3 +1,8 @@
+"""
+Code Interpreter - A simple interpreter in Python
+From CodeCrafters.io build-your-own-interpreter (Python)
+"""
+
 import sys
 
 
@@ -19,12 +24,10 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!", file=sys.stderr)
 
-    # TODO: Uncomment the code below to pass the first stage
-    # if file_contents:
-    #     raise NotImplementedError("Scanner not implemented")
-    # else:
-    #     print("EOF  null") # Placeholder, replace this line when implementing the scanner
-
+    if file_contents:
+        raise NotImplementedError("Scanner not implemented")
+    else:
+        print("EOF  null") # Placeholder, replace this line when implementing the scanner
 
 if __name__ == "__main__":
     main()
