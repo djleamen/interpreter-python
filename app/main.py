@@ -136,6 +136,14 @@ def main():
             else:
                 literal = float(lexeme)  # Still use float for consistency
             print(f"NUMBER {lexeme} {literal}")
+        elif char.isalpha() or char == '_':
+            # Identifier
+            start = i
+            while i < len(file_contents) and (file_contents[i].isalnum() or file_contents[i] == '_'):
+                i += 1
+
+            lexeme = file_contents[start:i]
+            print(f"IDENTIFIER {lexeme} null")
         elif char == '\n':
             line += 1
             i += 1
