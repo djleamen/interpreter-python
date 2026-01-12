@@ -98,13 +98,23 @@ class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.current = 0
+        self.had_error = False
 
     def parse(self):
         """Parse the tokens and return the expression."""
         try:
             return self.expression()
-        except (IndexError, ValueError):
+        except ParseException:
             return None
+
+    def error(self, token, message):
+        """Report an error at the given token."""
+        if token.type == "EOF":
+            print(f"[line {token.line}] Error at end: {message}", file=sys.stderr)
+        else:
+            print(f"[line {token.line}] Error at '{token.lexeme}': {message}", file=sys.stderr)
+        self.had_error = True
+        raise ParseException(message)
 
     def expression(self):
         """Parse an expression."""
@@ -170,7 +180,8 @@ class Parser:
             expr = self.expression()
             self.consume("RIGHT_PAREN", "Expect ')' after expression.")
             return Grouping(expr)
-        raise ParseException("Expected expression.")
+
+        self.error(self.peek(), "Expect expression.")
 
     def match(self, *types):
         """Check if the current token matches any of the given types."""
@@ -208,7 +219,7 @@ class Parser:
         """Consume a token of the given type or raise an error."""
         if self.check(token_type):
             return self.advance()
-        raise ParseException(message)
+        self.error(self.peek(), message)
 
 
 def tokenize(file_contents):
@@ -405,7 +416,7 @@ def main():
         parser = Parser(tokens)
         expr = parser.parse()
 
-        if expr is not None:
+        if expr is not None and not parser.had_error:
             printer = AstPrinter()
             print(printer.print(expr))
         else:
