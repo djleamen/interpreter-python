@@ -137,13 +137,37 @@ def main():
                 literal = float(lexeme)  # Still use float for consistency
             print(f"NUMBER {lexeme} {literal}")
         elif char.isalpha() or char == '_':
-            # Identifier
+            # Identifier or keyword
             start = i
             while i < len(file_contents) and (file_contents[i].isalnum() or file_contents[i] == '_'):
                 i += 1
 
             lexeme = file_contents[start:i]
-            print(f"IDENTIFIER {lexeme} null")
+
+            # Reserved keyword
+            keywords = {
+                'and': 'AND',
+                'class': 'CLASS',
+                'else': 'ELSE',
+                'false': 'FALSE',
+                'for': 'FOR',
+                'fun': 'FUN',
+                'if': 'IF',
+                'nil': 'NIL',
+                'or': 'OR',
+                'print': 'PRINT',
+                'return': 'RETURN',
+                'super': 'SUPER',
+                'this': 'THIS',
+                'true': 'TRUE',
+                'var': 'VAR',
+                'while': 'WHILE'
+            }
+
+            if lexeme in keywords:
+                print(f"{keywords[lexeme]} {lexeme} null")
+            else:
+                print(f"IDENTIFIER {lexeme} null")
         elif char == '\n':
             line += 1
             i += 1
