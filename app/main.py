@@ -136,12 +136,16 @@ class Interpreter:
                 self.check_number_operands(expr.operator, left, right)
                 return left * right
             elif expr.operator.type == "GREATER":
+                self.check_number_operands(expr.operator, left, right)
                 return left > right
             elif expr.operator.type == "GREATER_EQUAL":
+                self.check_number_operands(expr.operator, left, right)
                 return left >= right
             elif expr.operator.type == "LESS":
+                self.check_number_operands(expr.operator, left, right)
                 return left < right
             elif expr.operator.type == "LESS_EQUAL":
+                self.check_number_operands(expr.operator, left, right)
                 return left <= right
             elif expr.operator.type == "EQUAL_EQUAL":
                 return self.is_equal(left, right)
