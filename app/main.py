@@ -124,7 +124,11 @@ class Interpreter:
                 self.check_number_operands(expr.operator, left, right)
                 return left - right
             elif expr.operator.type == "PLUS":
-                return left + right
+                if isinstance(left, float) and isinstance(right, float):
+                    return left + right
+                if isinstance(left, str) and isinstance(right, str):
+                    return left + right
+                raise LoxRuntimeError(expr.operator, "Operands must be two numbers or two strings.")
             elif expr.operator.type == "SLASH":
                 self.check_number_operands(expr.operator, left, right)
                 return left / right
