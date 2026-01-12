@@ -121,12 +121,15 @@ class Interpreter:
             right = self.evaluate(expr.right)
 
             if expr.operator.type == "MINUS":
+                self.check_number_operands(expr.operator, left, right)
                 return left - right
             elif expr.operator.type == "PLUS":
                 return left + right
             elif expr.operator.type == "SLASH":
+                self.check_number_operands(expr.operator, left, right)
                 return left / right
             elif expr.operator.type == "STAR":
+                self.check_number_operands(expr.operator, left, right)
                 return left * right
             elif expr.operator.type == "GREATER":
                 return left > right
@@ -177,6 +180,12 @@ class Interpreter:
         if isinstance(operand, float):
             return
         raise LoxRuntimeError(operator, "Operand must be a number.")
+
+    def check_number_operands(self, operator, left, right):
+        """Check if both operands are numbers, raise LoxRuntimeError if not."""
+        if isinstance(left, float) and isinstance(right, float):
+            return
+        raise LoxRuntimeError(operator, "Operands must be numbers.")
 
 
 class Parser:
