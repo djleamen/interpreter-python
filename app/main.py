@@ -92,6 +92,78 @@ class AstPrinter:
         return result
 
 
+class Interpreter:
+    """Class to evaluate expressions."""
+
+    def evaluate(self, expr):
+        """Evaluate an expression and return its value."""
+        if isinstance(expr, Literal):
+            return expr.value
+        elif isinstance(expr, Grouping):
+            return self.evaluate(expr.expression)
+        elif isinstance(expr, Unary):
+            right = self.evaluate(expr.right)
+            if expr.operator.type == "MINUS":
+                return -right
+            elif expr.operator.type == "BANG":
+                return not self.is_truthy(right)
+        elif isinstance(expr, Binary):
+            left = self.evaluate(expr.left)
+            right = self.evaluate(expr.right)
+
+            if expr.operator.type == "MINUS":
+                return left - right
+            elif expr.operator.type == "PLUS":
+                return left + right
+            elif expr.operator.type == "SLASH":
+                return left / right
+            elif expr.operator.type == "STAR":
+                return left * right
+            elif expr.operator.type == "GREATER":
+                return left > right
+            elif expr.operator.type == "GREATER_EQUAL":
+                return left >= right
+            elif expr.operator.type == "LESS":
+                return left < right
+            elif expr.operator.type == "LESS_EQUAL":
+                return left <= right
+            elif expr.operator.type == "EQUAL_EQUAL":
+                return self.is_equal(left, right)
+            elif expr.operator.type == "BANG_EQUAL":
+                return not self.is_equal(left, right)
+        return None
+
+    def is_truthy(self, value):
+        """Determine if a value is truthy in Lox."""
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        return True
+
+    def is_equal(self, a, b):
+        """Check if two values are equal."""
+        if a is None and b is None:
+            return True
+        if a is None:
+            return False
+        return a == b
+
+    def stringify(self, value):
+        """Convert a value to its string representation."""
+        if value is None:
+            return "nil"
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, float):
+            text = str(value)
+            # Remove .0 suffix for whole numbers
+            if text.endswith(".0"):
+                text = text[:-2]
+            return text
+        return str(value)
+
+
 class Parser:
     """A simple recursive descent parser."""
 
@@ -387,7 +459,7 @@ def main():
     command = sys.argv[1]
     filename = sys.argv[2]
 
-    if command not in ["tokenize", "parse"]:
+    if command not in ["tokenize", "parse", "evaluate"]:
         print(f"Unknown command: {command}", file=sys.stderr)
         exit(1)
 
@@ -421,6 +493,22 @@ def main():
             print(printer.print(expr))
         else:
             exit(65)
+
+    elif command == "evaluate":
+        tokens, has_error = tokenize(file_contents)
+
+        if has_error:
+            exit(65)
+
+        parser = Parser(tokens)
+        expr = parser.parse()
+
+        if expr is None or parser.had_error:
+            exit(65)
+
+        interpreter = Interpreter()
+        value = interpreter.evaluate(expr)
+        print(interpreter.stringify(value))
 
 
 if __name__ == "__main__":
