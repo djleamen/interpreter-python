@@ -99,13 +99,51 @@ def main():
             else:
                 print("GREATER > null")
                 i += 1
+        elif char == '"':
+            # String literal
+            start = i
+            i += 1
+            string_line = line
+            while i < len(file_contents) and file_contents[i] != '"':
+                if file_contents[i] == '\n':
+                    line += 1
+                i += 1
+
+            if i >= len(file_contents):
+                print(
+                    f"[line {string_line}] Error: Unterminated string.", file=sys.stderr)
+                has_error = True
+            else:
+                i += 1
+                lexeme = file_contents[start:i]
+                literal = file_contents[start+1:i-1]
+                print(f"STRING {lexeme} {literal}")
+        elif char.isdigit():
+            # Number literal
+            start = i
+            while i < len(file_contents) and file_contents[i].isdigit():
+                i += 1
+
+            if i < len(file_contents) and file_contents[i] == '.' and i + 1 < len(file_contents) and file_contents[i + 1].isdigit():
+                i += 1  # consume the '.'
+                while i < len(file_contents) and file_contents[i].isdigit():
+                    i += 1
+
+            lexeme = file_contents[start:i]
+            # Format the number literal
+            if '.' in lexeme:
+                literal = float(lexeme)
+            else:
+                literal = float(lexeme)  # Still use float for consistency
+            print(f"NUMBER {lexeme} {literal}")
         elif char == '\n':
             line += 1
             i += 1
         elif char in ' \t\r':
             i += 1
         else:
-            print(f"[line {line}] Error: Unexpected character: {char}", file=sys.stderr)
+            print(
+                f"[line {line}] Error: Unexpected character: {char}", file=sys.stderr)
             has_error = True
             i += 1
 
@@ -114,6 +152,7 @@ def main():
     # Exit with code 65 if there were errors
     if has_error:
         exit(65)
+
 
 if __name__ == "__main__":
     main()
