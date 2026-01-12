@@ -63,6 +63,14 @@ def main():
         elif char == '*':
             print("STAR * null")
             i += 1
+        elif char == '/':
+            if i + 1 < len(file_contents) and file_contents[i + 1] == '/':
+                i += 2
+                while i < len(file_contents) and file_contents[i] != '\n':
+                    i += 1
+            else:
+                print("SLASH / null")
+                i += 1
         elif char == '=':
             if i + 1 < len(file_contents) and file_contents[i + 1] == '=':
                 print("EQUAL_EQUAL == null")
