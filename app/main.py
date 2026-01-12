@@ -26,34 +26,80 @@ def main():
     print("Logs from your program will appear here!", file=sys.stderr)
 
     has_error = False
+    i = 0
+    line = 1
 
     # Tokenize the file contents
-    for char in file_contents:
+    while i < len(file_contents):
+        char = file_contents[i]
+
         if char == '(':
             print("LEFT_PAREN ( null")
+            i += 1
         elif char == ')':
             print("RIGHT_PAREN ) null")
+            i += 1
         elif char == '{':
             print("LEFT_BRACE { null")
+            i += 1
         elif char == '}':
             print("RIGHT_BRACE } null")
+            i += 1
         elif char == ',':
             print("COMMA , null")
+            i += 1
         elif char == '.':
             print("DOT . null")
+            i += 1
         elif char == '-':
             print("MINUS - null")
+            i += 1
         elif char == '+':
             print("PLUS + null")
+            i += 1
         elif char == ';':
             print("SEMICOLON ; null")
+            i += 1
         elif char == '*':
             print("STAR * null")
-        elif char in ' \t\r\n':
-            pass
+            i += 1
+        elif char == '=':
+            if i + 1 < len(file_contents) and file_contents[i + 1] == '=':
+                print("EQUAL_EQUAL == null")
+                i += 2
+            else:
+                print("EQUAL = null")
+                i += 1
+        elif char == '!':
+            if i + 1 < len(file_contents) and file_contents[i + 1] == '=':
+                print("BANG_EQUAL != null")
+                i += 2
+            else:
+                print("BANG ! null")
+                i += 1
+        elif char == '<':
+            if i + 1 < len(file_contents) and file_contents[i + 1] == '=':
+                print("LESS_EQUAL <= null")
+                i += 2
+            else:
+                print("LESS < null")
+                i += 1
+        elif char == '>':
+            if i + 1 < len(file_contents) and file_contents[i + 1] == '=':
+                print("GREATER_EQUAL >= null")
+                i += 2
+            else:
+                print("GREATER > null")
+                i += 1
+        elif char == '\n':
+            line += 1
+            i += 1
+        elif char in ' \t\r':
+            i += 1
         else:
-            print(f"[line 1] Error: Unexpected character: {char}", file=sys.stderr)
+            print(f"[line {line}] Error: Unexpected character: {char}", file=sys.stderr)
             has_error = True
+            i += 1
 
     print("EOF  null")
 
