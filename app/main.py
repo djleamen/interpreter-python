@@ -61,6 +61,14 @@ class ParseException(Exception):
     pass
 
 
+class LoxRuntimeError(Exception):
+    """Exception raised during runtime evaluation."""
+    def __init__(self, token, message):
+        self.token = token
+        self.message = message
+        super().__init__(message)
+
+
 class AstPrinter:
     """Class to print the AST in a parenthesized format."""
 
@@ -104,6 +112,7 @@ class Interpreter:
         elif isinstance(expr, Unary):
             right = self.evaluate(expr.right)
             if expr.operator.type == "MINUS":
+                self.check_number_operand(expr.operator, right)
                 return -right
             elif expr.operator.type == "BANG":
                 return not self.is_truthy(right)
@@ -162,6 +171,12 @@ class Interpreter:
                 text = text[:-2]
             return text
         return str(value)
+
+    def check_number_operand(self, operator, operand):
+        """Check if operand is a number, raise LoxRuntimeError if not."""
+        if isinstance(operand, float):
+            return
+        raise LoxRuntimeError(operator, "Operand must be a number.")
 
 
 class Parser:
@@ -507,8 +522,13 @@ def main():
             exit(65)
 
         interpreter = Interpreter()
-        value = interpreter.evaluate(expr)
-        print(interpreter.stringify(value))
+        try:
+            value = interpreter.evaluate(expr)
+            print(interpreter.stringify(value))
+        except LoxRuntimeError as e:
+            print(e.message, file=sys.stderr)
+            print(f"[line {e.token.line}]", file=sys.stderr)
+            exit(70)
 
 
 if __name__ == "__main__":
