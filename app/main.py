@@ -99,6 +99,13 @@ class VarStmt(Stmt):
         self.initializer = initializer
 
 
+class BlockStmt(Stmt):
+    """Block statement."""
+
+    def __init__(self, statements):
+        self.statements = statements
+
+
 class ParseException(Exception):
     """Exception raised during parsing."""
     pass
@@ -185,6 +192,9 @@ class Interpreter:
             if stmt.initializer is not None:
                 value = self.evaluate(stmt.initializer)
             self.environment.define(stmt.name.lexeme, value)
+        elif isinstance(stmt, BlockStmt):
+            for statement in stmt.statements:
+                self.execute(statement)
 
     def evaluate(self, expr):
         """Evaluate an expression and return its value."""
@@ -339,7 +349,19 @@ class Parser:
         """Parse a single statement."""
         if self.match("PRINT"):
             return self.print_statement()
+        if self.match("LEFT_BRACE"):
+            return BlockStmt(self.block())
         return self.expression_statement()
+
+    def block(self):
+        """Parse a block of statements."""
+        statements = []
+
+        while not self.check("RIGHT_BRACE") and not self.is_at_end():
+            statements.append(self.declaration())
+
+        self.consume("RIGHT_BRACE", "Expect '}'.")
+        return statements
 
     def print_statement(self):
         """Parse a print statement."""
