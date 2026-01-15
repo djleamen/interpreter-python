@@ -113,6 +113,7 @@ class ParseException(Exception):
 
 class LoxRuntimeError(Exception):
     """Exception raised during runtime evaluation."""
+
     def __init__(self, token, message):
         self.token = token
         self.message = message
@@ -153,8 +154,9 @@ class AstPrinter:
 class Environment:
     """Environment for storing variables."""
 
-    def __init__(self):
+    def __init__(self, enclosing=None):
         self.values = {}
+        self.enclosing = enclosing
 
     def define(self, name, value):
         """Define a new variable."""
@@ -164,6 +166,10 @@ class Environment:
         """Get the value of a variable."""
         if name in self.values:
             return self.values[name]
+
+        if self.enclosing is not None:
+            return self.enclosing.get(name)
+
         raise RuntimeError(f"Undefined variable '{name}'.")
 
     def assign(self, name, value):
@@ -171,6 +177,11 @@ class Environment:
         if name in self.values:
             self.values[name] = value
             return
+
+        if self.enclosing is not None:
+            self.enclosing.assign(name, value)
+            return
+
         raise RuntimeError(f"Undefined variable '{name}'.")
 
 
@@ -193,8 +204,17 @@ class Interpreter:
                 value = self.evaluate(stmt.initializer)
             self.environment.define(stmt.name.lexeme, value)
         elif isinstance(stmt, BlockStmt):
-            for statement in stmt.statements:
+            self.execute_block(stmt.statements, Environment(self.environment))
+
+    def execute_block(self, statements, environment):
+        """Execute a block of statements in the given environment."""
+        previous = self.environment
+        try:
+            self.environment = environment
+            for statement in statements:
                 self.execute(statement)
+        finally:
+            self.environment = previous
 
     def evaluate(self, expr):
         """Evaluate an expression and return its value."""
@@ -204,13 +224,13 @@ class Interpreter:
             try:
                 return self.environment.get(expr.name.lexeme)
             except RuntimeError as e:
-                raise LoxRuntimeError(expr.name, str(e))
+                raise LoxRuntimeError(expr.name, str(e)) from e
         elif isinstance(expr, Assign):
             value = self.evaluate(expr.value)
             try:
                 self.environment.assign(expr.name.lexeme, value)
             except RuntimeError as e:
-                raise LoxRuntimeError(expr.name, str(e))
+                raise LoxRuntimeError(expr.name, str(e)) from e
             return value
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
@@ -233,7 +253,8 @@ class Interpreter:
                     return left + right
                 if isinstance(left, str) and isinstance(right, str):
                     return left + right
-                raise LoxRuntimeError(expr.operator, "Operands must be two numbers or two strings.")
+                raise LoxRuntimeError(
+                    expr.operator, "Operands must be two numbers or two strings.")
             elif expr.operator.type == "SLASH":
                 self.check_number_operands(expr.operator, left, right)
                 return left / right
@@ -337,11 +358,11 @@ class Parser:
     def var_declaration(self):
         """Parse a variable declaration."""
         name = self.consume("IDENTIFIER", "Expect variable name.")
-        
+
         initializer = None
         if self.match("EQUAL"):
             initializer = self.expression()
-        
+
         self.consume("SEMICOLON", "Expect ';' after variable declaration.")
         return VarStmt(name, initializer)
 
@@ -388,9 +409,11 @@ class Parser:
     def error(self, token, message):
         """Report an error at the given token."""
         if token.type == "EOF":
-            print(f"[line {token.line}] Error at end: {message}", file=sys.stderr)
+            print(f"[line {token.line}] Error at end: {message}",
+                  file=sys.stderr)
         else:
-            print(f"[line {token.line}] Error at '{token.lexeme}': {message}", file=sys.stderr)
+            print(
+                f"[line {token.line}] Error at '{token.lexeme}': {message}", file=sys.stderr)
         self.had_error = True
         raise ParseException(message)
 
