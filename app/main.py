@@ -63,6 +63,14 @@ class Variable(Expr):
         self.name = name
 
 
+class Assign(Expr):
+    """Assignment expression."""
+
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -187,6 +195,13 @@ class Interpreter:
                 return self.environment.get(expr.name.lexeme)
             except RuntimeError as e:
                 raise LoxRuntimeError(expr.name, str(e))
+        elif isinstance(expr, Assign):
+            value = self.evaluate(expr.value)
+            try:
+                self.environment.assign(expr.name.lexeme, value)
+            except RuntimeError as e:
+                raise LoxRuntimeError(expr.name, str(e))
+            return value
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
         elif isinstance(expr, Unary):
@@ -359,7 +374,23 @@ class Parser:
 
     def expression(self):
         """Parse an expression."""
-        return self.equality()
+        return self.assignment()
+
+    def assignment(self):
+        """Parse an assignment expression."""
+        expr = self.equality()
+
+        if self.match("EQUAL"):
+            equals = self.previous()
+            value = self.assignment()  # Right-associative
+
+            if isinstance(expr, Variable):
+                name = expr.name
+                return Assign(name, value)
+
+            self.error(equals, "Invalid assignment target.")
+
+        return expr
 
     def equality(self):
         """Parse equality expressions."""
