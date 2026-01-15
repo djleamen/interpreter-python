@@ -56,6 +56,13 @@ class Grouping(Expr):
         self.expression = expression
 
 
+class Variable(Expr):
+    """Variable expression."""
+
+    def __init__(self, name):
+        self.name = name
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -74,6 +81,14 @@ class ExpressionStmt(Stmt):
 
     def __init__(self, expression):
         self.expression = expression
+
+
+class VarStmt(Stmt):
+    """Variable declaration statement."""
+
+    def __init__(self, name, initializer):
+        self.name = name
+        self.initializer = initializer
 
 
 class ParseException(Exception):
@@ -120,8 +135,35 @@ class AstPrinter:
         return result
 
 
+class Environment:
+    """Environment for storing variables."""
+
+    def __init__(self):
+        self.values = {}
+
+    def define(self, name, value):
+        """Define a new variable."""
+        self.values[name] = value
+
+    def get(self, name):
+        """Get the value of a variable."""
+        if name in self.values:
+            return self.values[name]
+        raise RuntimeError(f"Undefined variable '{name}'.")
+
+    def assign(self, name, value):
+        """Assign a value to an existing variable."""
+        if name in self.values:
+            self.values[name] = value
+            return
+        raise RuntimeError(f"Undefined variable '{name}'.")
+
+
 class Interpreter:
     """Class to evaluate expressions."""
+
+    def __init__(self):
+        self.environment = Environment()
 
     def execute(self, stmt):
         """Execute a statement."""
@@ -130,11 +172,21 @@ class Interpreter:
             print(self.stringify(value))
         elif isinstance(stmt, ExpressionStmt):
             self.evaluate(stmt.expression)
+        elif isinstance(stmt, VarStmt):
+            value = None
+            if stmt.initializer is not None:
+                value = self.evaluate(stmt.initializer)
+            self.environment.define(stmt.name.lexeme, value)
 
     def evaluate(self, expr):
         """Evaluate an expression and return its value."""
         if isinstance(expr, Literal):
             return expr.value
+        elif isinstance(expr, Variable):
+            try:
+                return self.environment.get(expr.name.lexeme)
+            except RuntimeError as e:
+                raise LoxRuntimeError(expr.name, str(e))
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
         elif isinstance(expr, Unary):
@@ -244,12 +296,29 @@ class Parser:
         statements = []
         while not self.is_at_end():
             try:
-                stmt = self.statement()
+                stmt = self.declaration()
                 if stmt is not None:
                     statements.append(stmt)
             except ParseException:
                 self.synchronize()
         return statements
+
+    def declaration(self):
+        """Parse a declaration."""
+        if self.match("VAR"):
+            return self.var_declaration()
+        return self.statement()
+
+    def var_declaration(self):
+        """Parse a variable declaration."""
+        name = self.consume("IDENTIFIER", "Expect variable name.")
+        
+        initializer = None
+        if self.match("EQUAL"):
+            initializer = self.expression()
+        
+        self.consume("SEMICOLON", "Expect ';' after variable declaration.")
+        return VarStmt(name, initializer)
 
     def statement(self):
         """Parse a single statement."""
@@ -352,6 +421,8 @@ class Parser:
             expr = self.expression()
             self.consume("RIGHT_PAREN", "Expect ')' after expression.")
             return Grouping(expr)
+        if self.match("IDENTIFIER"):
+            return Variable(self.previous())
 
         self.error(self.peek(), "Expect expression.")
 
