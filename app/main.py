@@ -56,6 +56,26 @@ class Grouping(Expr):
         self.expression = expression
 
 
+# Statement classes
+class Stmt:
+    """Base class for statements."""
+    pass
+
+
+class PrintStmt(Stmt):
+    """Print statement."""
+
+    def __init__(self, expression):
+        self.expression = expression
+
+
+class ExpressionStmt(Stmt):
+    """Expression statement."""
+
+    def __init__(self, expression):
+        self.expression = expression
+
+
 class ParseException(Exception):
     """Exception raised during parsing."""
     pass
@@ -102,6 +122,14 @@ class AstPrinter:
 
 class Interpreter:
     """Class to evaluate expressions."""
+
+    def execute(self, stmt):
+        """Execute a statement."""
+        if isinstance(stmt, PrintStmt):
+            value = self.evaluate(stmt.expression)
+            print(self.stringify(value))
+        elif isinstance(stmt, ExpressionStmt):
+            self.evaluate(stmt.expression)
 
     def evaluate(self, expr):
         """Evaluate an expression and return its value."""
@@ -210,6 +238,46 @@ class Parser:
             return self.expression()
         except ParseException:
             return None
+
+    def parse_statements(self):
+        """Parse multiple statements and return a list."""
+        statements = []
+        while not self.is_at_end():
+            try:
+                stmt = self.statement()
+                if stmt is not None:
+                    statements.append(stmt)
+            except ParseException:
+                self.synchronize()
+        return statements
+
+    def statement(self):
+        """Parse a single statement."""
+        if self.match("PRINT"):
+            return self.print_statement()
+        return self.expression_statement()
+
+    def print_statement(self):
+        """Parse a print statement."""
+        expr = self.expression()
+        self.consume("SEMICOLON", "Expect ';' after value.")
+        return PrintStmt(expr)
+
+    def expression_statement(self):
+        """Parse an expression statement."""
+        expr = self.expression()
+        self.consume("SEMICOLON", "Expect ';' after expression.")
+        return ExpressionStmt(expr)
+
+    def synchronize(self):
+        """Synchronize after a parse error."""
+        self.advance()
+        while not self.is_at_end():
+            if self.previous().type == "SEMICOLON":
+                return
+            if self.peek().type in ["CLASS", "FUN", "VAR", "FOR", "IF", "WHILE", "PRINT", "RETURN"]:
+                return
+            self.advance()
 
     def error(self, token, message):
         """Report an error at the given token."""
@@ -491,7 +559,7 @@ def main():
     command = sys.argv[1]
     filename = sys.argv[2]
 
-    if command not in ["tokenize", "parse", "evaluate"]:
+    if command not in ["tokenize", "parse", "evaluate", "run"]:
         print(f"Unknown command: {command}", file=sys.stderr)
         exit(1)
 
@@ -542,6 +610,27 @@ def main():
         try:
             value = interpreter.evaluate(expr)
             print(interpreter.stringify(value))
+        except LoxRuntimeError as e:
+            print(e.message, file=sys.stderr)
+            print(f"[line {e.token.line}]", file=sys.stderr)
+            exit(70)
+
+    elif command == "run":
+        tokens, has_error = tokenize(file_contents)
+
+        if has_error:
+            exit(65)
+
+        parser = Parser(tokens)
+        statements = parser.parse_statements()
+
+        if parser.had_error:
+            exit(65)
+
+        interpreter = Interpreter()
+        try:
+            for stmt in statements:
+                interpreter.execute(stmt)
         except LoxRuntimeError as e:
             print(e.message, file=sys.stderr)
             print(f"[line {e.token.line}]", file=sys.stderr)
