@@ -3,7 +3,8 @@ Code Interpreter - A simple interpreter in Python
 From CodeCrafters.io build-your-own-interpreter (Python)
 """
 
-import sysimport time
+import sys
+import time
 
 class Token:
     """A simple Token class to represent tokens."""
@@ -140,6 +141,23 @@ class WhileStmt(Stmt):
         self.body = body
 
 
+class FunStmt(Stmt):
+    """Function declaration statement."""
+
+    def __init__(self, name, params, body):
+        self.name = name
+        self.params = params
+        self.body = body
+
+
+class ReturnStmt(Stmt):
+    """Return statement."""
+
+    def __init__(self, keyword, value):
+        self.keyword = keyword
+        self.value = value
+
+
 class ParseException(Exception):
     """Exception raised during parsing."""
     pass
@@ -152,6 +170,14 @@ class LoxRuntimeError(Exception):
         self.token = token
         self.message = message
         super().__init__(message)
+
+
+class Return(Exception):
+    """Exception used for return control flow."""
+
+    def __init__(self, value):
+        self.value = value
+        super().__init__()
 
 
 class AstPrinter:
@@ -208,6 +234,36 @@ class ClockNative(LoxCallable):
 
     def __str__(self):
         return "<native fn>"
+
+
+class LoxFunction(LoxCallable):
+    """User-defined Lox function."""
+
+    def __init__(self, declaration, closure):
+        self.declaration = declaration
+        self.closure = closure
+
+    def call(self, interpreter, arguments):
+        # Create new environment for function execution with closure as parent
+        environment = Environment(self.closure)
+        
+        # Bind parameters to arguments
+        for i in range(len(self.declaration.params)):
+            environment.define(self.declaration.params[i].lexeme, arguments[i])
+        
+        # Execute function body
+        try:
+            interpreter.execute_block(self.declaration.body, environment)
+        except Return as return_value:
+            return return_value.value
+        
+        return None
+
+    def arity(self):
+        return len(self.declaration.params)
+
+    def __str__(self):
+        return f"<fn {self.declaration.name.lexeme}>"
 
 
 class Environment:
@@ -274,6 +330,15 @@ class Interpreter:
         elif isinstance(stmt, WhileStmt):
             while self.is_truthy(self.evaluate(stmt.condition)):
                 self.execute(stmt.body)
+        elif isinstance(stmt, FunStmt):
+            # Create function with closure (current environment)
+            function = LoxFunction(stmt, self.environment)
+            self.environment.define(stmt.name.lexeme, function)
+        elif isinstance(stmt, ReturnStmt):
+            value = None
+            if stmt.value is not None:
+                value = self.evaluate(stmt.value)
+            raise Return(value)
 
     def execute_block(self, statements, environment):
         """Execute a block of statements in the given environment."""
@@ -448,9 +513,33 @@ class Parser:
 
     def declaration(self):
         """Parse a declaration."""
+        if self.match("FUN"):
+            return self.function("function")
         if self.match("VAR"):
             return self.var_declaration()
         return self.statement()
+
+    def function(self, kind):
+        """Parse a function declaration."""
+        name = self.consume("IDENTIFIER", f"Expect {kind} name.")
+        self.consume("LEFT_PAREN", f"Expect '(' after {kind} name.")
+        
+        parameters = []
+        if not self.check("RIGHT_PAREN"):
+            while True:
+                if len(parameters) >= 255:
+                    self.error(self.peek(), "Can't have more than 255 parameters.")
+                
+                parameters.append(self.consume("IDENTIFIER", "Expect parameter name."))
+                
+                if not self.match("COMMA"):
+                    break
+        
+        self.consume("RIGHT_PAREN", "Expect ')' after parameters.")
+        self.consume("LEFT_BRACE", f"Expect '{{' before {kind} body.")
+        body = self.block()
+        
+        return FunStmt(name, parameters, body)
 
     def var_declaration(self):
         """Parse a variable declaration."""
@@ -475,6 +564,8 @@ class Parser:
             return self.while_statement()
         if self.match("FOR"):
             return self.for_statement()
+        if self.match("RETURN"):
+            return self.return_statement()
         return self.expression_statement()
 
     def block(self):
@@ -553,6 +644,16 @@ class Parser:
             body = BlockStmt([initializer, body])
 
         return body
+
+    def return_statement(self):
+        """Parse a return statement."""
+        keyword = self.previous()
+        value = None
+        if not self.check("SEMICOLON"):
+            value = self.expression()
+        
+        self.consume("SEMICOLON", "Expect ';' after return value.")
+        return ReturnStmt(keyword, value)
 
     def expression_statement(self):
         """Parse an expression statement."""
