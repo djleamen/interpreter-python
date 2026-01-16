@@ -6,6 +6,7 @@ From CodeCrafters.io build-your-own-interpreter (Python)
 import sys
 import time
 
+
 class Token:
     """A simple Token class to represent tokens."""
 
@@ -246,17 +247,17 @@ class LoxFunction(LoxCallable):
     def call(self, interpreter, arguments):
         # Create new environment for function execution with closure as parent
         environment = Environment(self.closure)
-        
+
         # Bind parameters to arguments
-        for i in range(len(self.declaration.params)):
-            environment.define(self.declaration.params[i].lexeme, arguments[i])
-        
+        for i, param in enumerate(self.declaration.params):
+            environment.define(param.lexeme, arguments[i])
+
         # Execute function body
         try:
             interpreter.execute_block(self.declaration.body, environment)
         except Return as return_value:
             return return_value.value
-        
+
         return None
 
     def arity(self):
@@ -430,7 +431,8 @@ class Interpreter:
                 arguments.append(self.evaluate(argument))
 
             if not isinstance(callee, LoxCallable):
-                raise LoxRuntimeError(expr.paren, "Can only call functions and classes.")
+                raise LoxRuntimeError(
+                    expr.paren, "Can only call functions and classes.")
 
             function = callee
             if len(arguments) != function.arity():
@@ -523,22 +525,24 @@ class Parser:
         """Parse a function declaration."""
         name = self.consume("IDENTIFIER", f"Expect {kind} name.")
         self.consume("LEFT_PAREN", f"Expect '(' after {kind} name.")
-        
+
         parameters = []
         if not self.check("RIGHT_PAREN"):
             while True:
                 if len(parameters) >= 255:
-                    self.error(self.peek(), "Can't have more than 255 parameters.")
-                
-                parameters.append(self.consume("IDENTIFIER", "Expect parameter name."))
-                
+                    self.error(
+                        self.peek(), "Can't have more than 255 parameters.")
+
+                parameters.append(self.consume(
+                    "IDENTIFIER", "Expect parameter name."))
+
                 if not self.match("COMMA"):
                     break
-        
+
         self.consume("RIGHT_PAREN", "Expect ')' after parameters.")
         self.consume("LEFT_BRACE", f"Expect '{{' before {kind} body.")
         body = self.block()
-        
+
         return FunStmt(name, parameters, body)
 
     def var_declaration(self):
@@ -651,7 +655,7 @@ class Parser:
         value = None
         if not self.check("SEMICOLON"):
             value = self.expression()
-        
+
         self.consume("SEMICOLON", "Expect ';' after return value.")
         return ReturnStmt(keyword, value)
 
