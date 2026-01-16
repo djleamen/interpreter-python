@@ -106,6 +106,15 @@ class BlockStmt(Stmt):
         self.statements = statements
 
 
+class IfStmt(Stmt):
+    """If statement."""
+
+    def __init__(self, condition, then_branch, else_branch):
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+
+
 class ParseException(Exception):
     """Exception raised during parsing."""
     pass
@@ -205,6 +214,11 @@ class Interpreter:
             self.environment.define(stmt.name.lexeme, value)
         elif isinstance(stmt, BlockStmt):
             self.execute_block(stmt.statements, Environment(self.environment))
+        elif isinstance(stmt, IfStmt):
+            if self.is_truthy(self.evaluate(stmt.condition)):
+                self.execute(stmt.then_branch)
+            elif stmt.else_branch is not None:
+                self.execute(stmt.else_branch)
 
     def execute_block(self, statements, environment):
         """Execute a block of statements in the given environment."""
@@ -372,6 +386,8 @@ class Parser:
             return self.print_statement()
         if self.match("LEFT_BRACE"):
             return BlockStmt(self.block())
+        if self.match("IF"):
+            return self.if_statement()
         return self.expression_statement()
 
     def block(self):
@@ -389,6 +405,19 @@ class Parser:
         expr = self.expression()
         self.consume("SEMICOLON", "Expect ';' after value.")
         return PrintStmt(expr)
+
+    def if_statement(self):
+        """Parse an if statement."""
+        self.consume("LEFT_PAREN", "Expect '(' after 'if'.")
+        condition = self.expression()
+        self.consume("RIGHT_PAREN", "Expect ')' after if condition.")
+
+        then_branch = self.statement()
+        else_branch = None
+        if self.match("ELSE"):
+            else_branch = self.statement()
+
+        return IfStmt(condition, then_branch, else_branch)
 
     def expression_statement(self):
         """Parse an expression statement."""
