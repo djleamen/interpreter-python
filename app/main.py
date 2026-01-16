@@ -71,6 +71,15 @@ class Assign(Expr):
         self.value = value
 
 
+class Logical(Expr):
+    """Logical expression (and/or)."""
+
+    def __init__(self, left, operator, right):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -113,6 +122,14 @@ class IfStmt(Stmt):
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
+
+
+class WhileStmt(Stmt):
+    """While statement."""
+
+    def __init__(self, condition, body):
+        self.condition = condition
+        self.body = body
 
 
 class ParseException(Exception):
@@ -219,6 +236,9 @@ class Interpreter:
                 self.execute(stmt.then_branch)
             elif stmt.else_branch is not None:
                 self.execute(stmt.else_branch)
+        elif isinstance(stmt, WhileStmt):
+            while self.is_truthy(self.evaluate(stmt.condition)):
+                self.execute(stmt.body)
 
     def execute_block(self, statements, environment):
         """Execute a block of statements in the given environment."""
@@ -248,6 +268,17 @@ class Interpreter:
             return value
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
+        elif isinstance(expr, Logical):
+            left = self.evaluate(expr.left)
+
+            if expr.operator.type == "OR":
+                if self.is_truthy(left):
+                    return left
+            else:  # AND
+                if not self.is_truthy(left):
+                    return left
+
+            return self.evaluate(expr.right)
         elif isinstance(expr, Unary):
             right = self.evaluate(expr.right)
             if expr.operator.type == "MINUS":
@@ -388,6 +419,10 @@ class Parser:
             return BlockStmt(self.block())
         if self.match("IF"):
             return self.if_statement()
+        if self.match("WHILE"):
+            return self.while_statement()
+        if self.match("FOR"):
+            return self.for_statement()
         return self.expression_statement()
 
     def block(self):
@@ -418,6 +453,54 @@ class Parser:
             else_branch = self.statement()
 
         return IfStmt(condition, then_branch, else_branch)
+
+    def while_statement(self):
+        """Parse a while statement."""
+        self.consume("LEFT_PAREN", "Expect '(' after 'while'.")
+        condition = self.expression()
+        self.consume("RIGHT_PAREN", "Expect ')' after condition.")
+        body = self.statement()
+
+        return WhileStmt(condition, body)
+
+    def for_statement(self):
+        """Parse a for statement (desugars to while)."""
+        self.consume("LEFT_PAREN", "Expect '(' after 'for'.")
+
+        # Initializer
+        initializer = None
+        if self.match("SEMICOLON"):
+            initializer = None
+        elif self.match("VAR"):
+            initializer = self.var_declaration()
+        else:
+            initializer = self.expression_statement()
+
+        # Condition
+        condition = None
+        if not self.check("SEMICOLON"):
+            condition = self.expression()
+        self.consume("SEMICOLON", "Expect ';' after loop condition.")
+
+        # Increment
+        increment = None
+        if not self.check("RIGHT_PAREN"):
+            increment = self.expression()
+        self.consume("RIGHT_PAREN", "Expect ')' after for clauses.")
+
+        body = self.statement()
+
+        if increment is not None:
+            body = BlockStmt([body, ExpressionStmt(increment)])
+
+        if condition is None:
+            condition = Literal(True)
+        body = WhileStmt(condition, body)
+
+        if initializer is not None:
+            body = BlockStmt([initializer, body])
+
+        return body
 
     def expression_statement(self):
         """Parse an expression statement."""
@@ -452,7 +535,7 @@ class Parser:
 
     def assignment(self):
         """Parse an assignment expression."""
-        expr = self.equality()
+        expr = self.or_expression()
 
         if self.match("EQUAL"):
             equals = self.previous()
@@ -463,6 +546,28 @@ class Parser:
                 return Assign(name, value)
 
             self.error(equals, "Invalid assignment target.")
+
+        return expr
+
+    def or_expression(self):
+        """Parse logical or expression."""
+        expr = self.and_expression()
+
+        while self.match("OR"):
+            operator = self.previous()
+            right = self.and_expression()
+            expr = Logical(expr, operator, right)
+
+        return expr
+
+    def and_expression(self):
+        """Parse logical and expression."""
+        expr = self.equality()
+
+        while self.match("AND"):
+            operator = self.previous()
+            right = self.equality()
+            expr = Logical(expr, operator, right)
 
         return expr
 
