@@ -3,8 +3,7 @@ Code Interpreter - A simple interpreter in Python
 From CodeCrafters.io build-your-own-interpreter (Python)
 """
 
-import sys
-
+import sysimport time
 
 class Token:
     """A simple Token class to represent tokens."""
@@ -78,6 +77,15 @@ class Logical(Expr):
         self.left = left
         self.operator = operator
         self.right = right
+
+
+class Call(Expr):
+    """Call expression."""
+
+    def __init__(self, callee, paren, arguments):
+        self.callee = callee
+        self.paren = paren
+        self.arguments = arguments
 
 
 # Statement classes
@@ -177,6 +185,31 @@ class AstPrinter:
         return result
 
 
+class LoxCallable:
+    """Base class for callable objects."""
+
+    def call(self, interpreter, arguments):
+        """Execute the callable."""
+        raise NotImplementedError()
+
+    def arity(self):
+        """Return the number of arguments expected."""
+        raise NotImplementedError()
+
+
+class ClockNative(LoxCallable):
+    """Native clock function."""
+
+    def call(self, interpreter, arguments):
+        return time.time()
+
+    def arity(self):
+        return 0
+
+    def __str__(self):
+        return "<native fn>"
+
+
 class Environment:
     """Environment for storing variables."""
 
@@ -216,6 +249,8 @@ class Interpreter:
 
     def __init__(self):
         self.environment = Environment()
+        # Define native functions
+        self.environment.define("clock", ClockNative())
 
     def execute(self, stmt):
         """Execute a statement."""
@@ -322,6 +357,23 @@ class Interpreter:
                 return self.is_equal(left, right)
             elif expr.operator.type == "BANG_EQUAL":
                 return not self.is_equal(left, right)
+        elif isinstance(expr, Call):
+            callee = self.evaluate(expr.callee)
+
+            arguments = []
+            for argument in expr.arguments:
+                arguments.append(self.evaluate(argument))
+
+            if not isinstance(callee, LoxCallable):
+                raise LoxRuntimeError(expr.paren, "Can only call functions and classes.")
+
+            function = callee
+            if len(arguments) != function.arity():
+                raise LoxRuntimeError(
+                    expr.paren,
+                    f"Expected {function.arity()} arguments but got {len(arguments)}.")
+
+            return function.call(self, arguments)
         return None
 
     def is_truthy(self, value):
@@ -613,7 +665,32 @@ class Parser:
             operator = self.previous()
             right = self.unary()
             return Unary(operator, right)
-        return self.primary()
+        return self.call()
+
+    def call(self):
+        """Parse call expressions."""
+        expr = self.primary()
+
+        while True:
+            if self.match("LEFT_PAREN"):
+                expr = self.finish_call(expr)
+            else:
+                break
+
+        return expr
+
+    def finish_call(self, callee):
+        """Finish parsing a call expression."""
+        arguments = []
+
+        if not self.check("RIGHT_PAREN"):
+            while True:
+                arguments.append(self.expression())
+                if not self.match("COMMA"):
+                    break
+
+        paren = self.consume("RIGHT_PAREN", "Expect ')' after arguments.")
+        return Call(callee, paren, arguments)
 
     def primary(self):
         """Parse primary expressions."""
