@@ -331,6 +331,7 @@ class Resolver:
         self.interpreter = interpreter
         self.scopes = []  # Stack of scopes
         self.had_error = False
+        self.current_function = None
 
     def resolve(self, item):
         """Resolve a statement, expression, or list of statements."""
@@ -367,6 +368,8 @@ class Resolver:
         elif isinstance(stmt, PrintStmt):
             self.resolve(stmt.expression)
         elif isinstance(stmt, ReturnStmt):
+            if self.current_function is None:
+                self.error(stmt.keyword, "Can't return from top-level code.")
             if stmt.value is not None:
                 self.resolve(stmt.value)
         elif isinstance(stmt, WhileStmt):
@@ -402,12 +405,17 @@ class Resolver:
 
     def resolve_function(self, function):
         """Resolve a function declaration."""
+        enclosing_function = self.current_function
+        self.current_function = "function"
+
         self.begin_scope()
         for param in function.params:
             self.declare(param)
             self.define(param)
         self.resolve(function.body)
         self.end_scope()
+
+        self.current_function = enclosing_function
 
     def begin_scope(self):
         """Begin a new scope."""
