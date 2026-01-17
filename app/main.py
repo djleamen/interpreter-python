@@ -288,6 +288,22 @@ class Environment:
 
         raise RuntimeError(f"Undefined variable '{name}'.")
 
+    def get_at(self, distance, name):
+        """Get a variable at a specific distance in the environment chain."""
+        env = self.ancestor(distance)
+        if env is None:
+            raise RuntimeError(f"Environment not found at distance {distance}")
+        return env.values[name]
+
+    def ancestor(self, distance):
+        """Get the environment at a specific distance."""
+        environment = self
+        for _ in range(distance):
+            if environment is None:
+                return None
+            environment = environment.enclosing
+        return environment
+
     def assign(self, name, value):
         """Assign a value to an existing variable."""
         if name in self.values:
@@ -300,14 +316,149 @@ class Environment:
 
         raise RuntimeError(f"Undefined variable '{name}'.")
 
+    def assign_at(self, distance, name, value):
+        """Assign a value to a variable at a specific distance."""
+        env = self.ancestor(distance)
+        if env is None:
+            raise RuntimeError(f"Environment not found at distance {distance}")
+        env.values[name] = value
+
+
+class Resolver:
+    """Resolver for compile-time identifier resolution."""
+
+    def __init__(self, interpreter):
+        self.interpreter = interpreter
+        self.scopes = []  # Stack of scopes
+        self.had_error = False
+
+    def resolve(self, item):
+        """Resolve a statement, expression, or list of statements."""
+        if isinstance(item, list):
+            for statement in item:
+                self.resolve(statement)
+        elif isinstance(item, Stmt):
+            self.resolve_stmt(item)
+        elif isinstance(item, Expr):
+            self.resolve_expr(item)
+
+    def resolve_stmt(self, stmt):
+        """Resolve a statement."""
+        if isinstance(stmt, BlockStmt):
+            self.begin_scope()
+            self.resolve(stmt.statements)
+            self.end_scope()
+        elif isinstance(stmt, VarStmt):
+            self.declare(stmt.name)
+            if stmt.initializer is not None:
+                self.resolve(stmt.initializer)
+            self.define(stmt.name)
+        elif isinstance(stmt, FunStmt):
+            self.declare(stmt.name)
+            self.define(stmt.name)
+            self.resolve_function(stmt)
+        elif isinstance(stmt, ExpressionStmt):
+            self.resolve(stmt.expression)
+        elif isinstance(stmt, IfStmt):
+            self.resolve(stmt.condition)
+            self.resolve(stmt.then_branch)
+            if stmt.else_branch is not None:
+                self.resolve(stmt.else_branch)
+        elif isinstance(stmt, PrintStmt):
+            self.resolve(stmt.expression)
+        elif isinstance(stmt, ReturnStmt):
+            if stmt.value is not None:
+                self.resolve(stmt.value)
+        elif isinstance(stmt, WhileStmt):
+            self.resolve(stmt.condition)
+            self.resolve(stmt.body)
+
+    def resolve_expr(self, expr):
+        """Resolve an expression."""
+        if isinstance(expr, Variable):
+            if self.scopes and self.scopes[-1].get(expr.name.lexeme) is False:
+                self.error(
+                    expr.name, "Can't read local variable in its own initializer.")
+            self.resolve_local(expr, expr.name)
+        elif isinstance(expr, Assign):
+            self.resolve(expr.value)
+            self.resolve_local(expr, expr.name)
+        elif isinstance(expr, Binary):
+            self.resolve(expr.left)
+            self.resolve(expr.right)
+        elif isinstance(expr, Call):
+            self.resolve(expr.callee)
+            for argument in expr.arguments:
+                self.resolve(argument)
+        elif isinstance(expr, Grouping):
+            self.resolve(expr.expression)
+        elif isinstance(expr, Literal):
+            pass  # Nothing to resolve
+        elif isinstance(expr, Logical):
+            self.resolve(expr.left)
+            self.resolve(expr.right)
+        elif isinstance(expr, Unary):
+            self.resolve(expr.right)
+
+    def resolve_function(self, function):
+        """Resolve a function declaration."""
+        self.begin_scope()
+        for param in function.params:
+            self.declare(param)
+            self.define(param)
+        self.resolve(function.body)
+        self.end_scope()
+
+    def begin_scope(self):
+        """Begin a new scope."""
+        self.scopes.append({})
+
+    def end_scope(self):
+        """End the current scope."""
+        self.scopes.pop()
+
+    def declare(self, name):
+        """Declare a variable in the current scope."""
+        if not self.scopes:
+            return
+        scope = self.scopes[-1]
+        if name.lexeme in scope:
+            self.error(name, "Already a variable with this name in this scope.")
+        scope[name.lexeme] = False
+
+    def define(self, name):
+        """Define a variable in the current scope."""
+        if not self.scopes:
+            return
+        self.scopes[-1][name.lexeme] = True
+
+    def resolve_local(self, expr, name):
+        """Resolve a local variable."""
+        for i in range(len(self.scopes) - 1, -1, -1):
+            if name.lexeme in self.scopes[i]:
+                self.interpreter.resolve(expr, len(self.scopes) - 1 - i)
+                return
+
+    def error(self, token, message):
+        """Report an error."""
+        print(
+            f"[line {token.line}] Error at '{token.lexeme}': {message}", file=sys.stderr)
+        self.had_error = True
+
 
 class Interpreter:
     """Class to evaluate expressions."""
 
     def __init__(self):
-        self.environment = Environment()
+        self.globals = Environment()
+        self.environment = self.globals
         # Define native functions
-        self.environment.define("clock", ClockNative())
+        self.globals.define("clock", ClockNative())
+        self.locals = {}  # Maps expressions to their resolved depths
+
+    def resolve(self, expr, depth):
+        """Store the resolved depth for an expression."""
+        self.locals[id(expr)] = depth
 
     def execute(self, stmt):
         """Execute a statement."""
@@ -356,16 +507,14 @@ class Interpreter:
         if isinstance(expr, Literal):
             return expr.value
         elif isinstance(expr, Variable):
-            try:
-                return self.environment.get(expr.name.lexeme)
-            except RuntimeError as e:
-                raise LoxRuntimeError(expr.name, str(e)) from e
+            return self.lookup_variable(expr.name, expr)
         elif isinstance(expr, Assign):
             value = self.evaluate(expr.value)
-            try:
-                self.environment.assign(expr.name.lexeme, value)
-            except RuntimeError as e:
-                raise LoxRuntimeError(expr.name, str(e)) from e
+            distance = self.locals.get(id(expr))
+            if distance is not None:
+                self.environment.assign_at(distance, expr.name.lexeme, value)
+            else:
+                self.globals.assign(expr.name.lexeme, value)
             return value
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
@@ -484,6 +633,18 @@ class Interpreter:
         if isinstance(left, float) and isinstance(right, float):
             return
         raise LoxRuntimeError(operator, "Operands must be numbers.")
+
+    def lookup_variable(self, name, expr):
+        """Look up a variable using resolved depth if available."""
+        distance = self.locals.get(id(expr))
+        if distance is not None:
+            return self.environment.get_at(distance, name.lexeme)
+        else:
+            # Global variable - look up in global environment
+            try:
+                return self.globals.get(name.lexeme)
+            except RuntimeError as e:
+                raise LoxRuntimeError(name, str(e)) from e
 
 
 class Parser:
@@ -1091,6 +1252,14 @@ def main():
             exit(65)
 
         interpreter = Interpreter()
+
+        # Resolve all identifiers before execution
+        resolver = Resolver(interpreter)
+        resolver.resolve(statements)
+
+        if resolver.had_error:
+            exit(65)
+
         try:
             for stmt in statements:
                 interpreter.execute(stmt)
