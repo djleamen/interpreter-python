@@ -265,9 +265,16 @@ class ClockNative(LoxCallable):
 class LoxFunction(LoxCallable):
     """User-defined Lox function."""
 
-    def __init__(self, declaration, closure):
+    def __init__(self, declaration, closure, is_initializer=False):
         self.declaration = declaration
         self.closure = closure
+        self.is_initializer = is_initializer
+
+    def bind(self, instance):
+        """Bind this function to an instance."""
+        environment = Environment(self.closure)
+        environment.define("this", instance)
+        return LoxFunction(self.declaration, environment, self.is_initializer)
 
     def call(self, interpreter, arguments):
         # Create new environment for function execution with closure as parent
@@ -295,8 +302,15 @@ class LoxFunction(LoxCallable):
 class LoxClass(LoxCallable):
     """Lox class."""
 
-    def __init__(self, name):
+    def __init__(self, name, methods):
         self.name = name
+        self.methods = methods
+
+    def find_method(self, name):
+        """Find a method by name."""
+        if name in self.methods:
+            return self.methods[name]
+        return None
 
     def call(self, interpreter, arguments):
         """Instantiate the class."""
@@ -322,6 +336,11 @@ class LoxInstance:
         """Get a property from the instance."""
         if name.lexeme in self.fields:
             return self.fields[name.lexeme]
+
+        # Look for a method in the class
+        method = self.klass.find_method(name.lexeme)
+        if method is not None:
+            return method.bind(self)
 
         raise LoxRuntimeError(name, f"Undefined property '{name.lexeme}'.")
 
@@ -571,8 +590,13 @@ class Interpreter:
             function = LoxFunction(stmt, self.environment)
             self.environment.define(stmt.name.lexeme, function)
         elif isinstance(stmt, ClassStmt):
-            # Create class and define it in the environment
-            klass = LoxClass(stmt.name.lexeme)
+            # Create class with methods and define it in the environment
+            methods = {}
+            for method in stmt.methods:
+                function = LoxFunction(method, self.environment)
+                methods[method.name.lexeme] = function
+
+            klass = LoxClass(stmt.name.lexeme, methods)
             self.environment.define(stmt.name.lexeme, klass)
         elif isinstance(stmt, ReturnStmt):
             value = None
