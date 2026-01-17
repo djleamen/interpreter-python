@@ -590,14 +590,18 @@ class Interpreter:
             function = LoxFunction(stmt, self.environment)
             self.environment.define(stmt.name.lexeme, function)
         elif isinstance(stmt, ClassStmt):
-            # Create class with methods and define it in the environment
+            # Define class name first so methods can reference it
+            self.environment.define(stmt.name.lexeme, None)
+
+            # Create methods - they capture the current environment
             methods = {}
             for method in stmt.methods:
                 function = LoxFunction(method, self.environment)
                 methods[method.name.lexeme] = function
 
+            # Create the class and update the environment
             klass = LoxClass(stmt.name.lexeme, methods)
-            self.environment.define(stmt.name.lexeme, klass)
+            self.environment.values[stmt.name.lexeme] = klass
         elif isinstance(stmt, ReturnStmt):
             value = None
             if stmt.value is not None:
