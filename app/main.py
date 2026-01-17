@@ -275,14 +275,33 @@ class LoxFunction(LoxCallable):
         return f"<fn {self.declaration.name.lexeme}>"
 
 
-class LoxClass:
+class LoxClass(LoxCallable):
     """Lox class."""
 
     def __init__(self, name):
         self.name = name
 
+    def call(self, interpreter, arguments):
+        """Instantiate the class."""
+        instance = LoxInstance(self)
+        return instance
+
+    def arity(self):
+        """Classes take no arguments for now."""
+        return 0
+
     def __str__(self):
         return self.name
+
+
+class LoxInstance:
+    """Lox class instance."""
+
+    def __init__(self, klass):
+        self.klass = klass
+
+    def __str__(self):
+        return f"{self.klass.name} instance"
 
 
 class Environment:
