@@ -262,6 +262,40 @@ class ClockNative(LoxCallable):
         return "<native fn>"
 
 
+class BoundMethod(LoxCallable):
+    """A method bound to an instance."""
+
+    def __init__(self, instance, method):
+        self.instance = instance
+        self.method = method
+
+    def call(self, interpreter, arguments):
+        # Create environment for method execution
+        environment = Environment(self.method.closure)
+
+        # Define "this" in the method's environment
+        environment.define("this", self.instance)
+
+        # Bind parameters to arguments
+        for i, param in enumerate(self.method.declaration.params):
+            environment.define(param.lexeme, arguments[i])
+
+        # Execute method body
+        try:
+            interpreter.execute_block(
+                self.method.declaration.body, environment)
+        except Return as return_value:
+            return return_value.value
+
+        return None
+
+    def arity(self):
+        return self.method.arity()
+
+    def __str__(self):
+        return f"<fn {self.method.declaration.name.lexeme}>"
+
+
 class LoxFunction(LoxCallable):
     """User-defined Lox function."""
 
@@ -272,9 +306,7 @@ class LoxFunction(LoxCallable):
 
     def bind(self, instance):
         """Bind this function to an instance."""
-        environment = Environment(self.closure)
-        environment.define("this", instance)
-        return LoxFunction(self.declaration, environment, self.is_initializer)
+        return BoundMethod(instance, self)
 
     def call(self, interpreter, arguments):
         # Create new environment for function execution with closure as parent
