@@ -90,6 +90,23 @@ class Call(Expr):
         self.arguments = arguments
 
 
+class Get(Expr):
+    """Property get expression."""
+
+    def __init__(self, obj, name):
+        self.obj = obj
+        self.name = name
+
+
+class Set(Expr):
+    """Property set expression."""
+
+    def __init__(self, obj, name, value):
+        self.obj = obj
+        self.name = name
+        self.value = value
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -299,6 +316,18 @@ class LoxInstance:
 
     def __init__(self, klass):
         self.klass = klass
+        self.fields = {}
+
+    def get(self, name):
+        """Get a property from the instance."""
+        if name.lexeme in self.fields:
+            return self.fields[name.lexeme]
+
+        raise LoxRuntimeError(name, f"Undefined property '{name.lexeme}'.")
+
+    def set(self, name, value):
+        """Set a property on the instance."""
+        self.fields[name.lexeme] = value
 
     def __str__(self):
         return f"{self.klass.name} instance"
@@ -435,6 +464,11 @@ class Resolver:
             self.resolve(expr.callee)
             for argument in expr.arguments:
                 self.resolve(argument)
+        elif isinstance(expr, Get):
+            self.resolve(expr.obj)
+        elif isinstance(expr, Set):
+            self.resolve(expr.value)
+            self.resolve(expr.obj)
         elif isinstance(expr, Grouping):
             self.resolve(expr.expression)
         elif isinstance(expr, Literal):
@@ -644,6 +678,20 @@ class Interpreter:
                     f"Expected {function.arity()} arguments but got {len(arguments)}.")
 
             return function.call(self, arguments)
+        elif isinstance(expr, Get):
+            obj = self.evaluate(expr.obj)
+            if isinstance(obj, LoxInstance):
+                return obj.get(expr.name)
+            raise LoxRuntimeError(expr.name, "Only instances have properties.")
+        elif isinstance(expr, Set):
+            obj = self.evaluate(expr.obj)
+
+            if not isinstance(obj, LoxInstance):
+                raise LoxRuntimeError(expr.name, "Only instances have fields.")
+
+            value = self.evaluate(expr.value)
+            obj.set(expr.name, value)
+            return value
         return None
 
     def is_truthy(self, value):
@@ -930,6 +978,8 @@ class Parser:
             if isinstance(expr, Variable):
                 name = expr.name
                 return Assign(name, value)
+            elif isinstance(expr, Get):
+                return Set(expr.obj, expr.name, value)
 
             self.error(equals, "Invalid assignment target.")
 
@@ -1008,6 +1058,10 @@ class Parser:
         while True:
             if self.match("LEFT_PAREN"):
                 expr = self.finish_call(expr)
+            elif self.match("DOT"):
+                name = self.consume(
+                    "IDENTIFIER", "Expect property name after '.'.")
+                expr = Get(expr, name)
             else:
                 break
 
