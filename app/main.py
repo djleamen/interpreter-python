@@ -151,6 +151,14 @@ class FunStmt(Stmt):
         self.body = body
 
 
+class ClassStmt(Stmt):
+    """Class declaration statement."""
+
+    def __init__(self, name, methods):
+        self.name = name
+        self.methods = methods
+
+
 class ReturnStmt(Stmt):
     """Return statement."""
 
@@ -267,6 +275,16 @@ class LoxFunction(LoxCallable):
         return f"<fn {self.declaration.name.lexeme}>"
 
 
+class LoxClass:
+    """Lox class."""
+
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+
 class Environment:
     """Environment for storing variables."""
 
@@ -358,6 +376,11 @@ class Resolver:
             self.declare(stmt.name)
             self.define(stmt.name)
             self.resolve_function(stmt)
+        elif isinstance(stmt, ClassStmt):
+            self.declare(stmt.name)
+            self.define(stmt.name)
+            for method in stmt.methods:
+                self.resolve_function(method)
         elif isinstance(stmt, ExpressionStmt):
             self.resolve(stmt.expression)
         elif isinstance(stmt, IfStmt):
@@ -494,6 +517,10 @@ class Interpreter:
             # Create function with closure (current environment)
             function = LoxFunction(stmt, self.environment)
             self.environment.define(stmt.name.lexeme, function)
+        elif isinstance(stmt, ClassStmt):
+            # Create class and define it in the environment
+            klass = LoxClass(stmt.name.lexeme)
+            self.environment.define(stmt.name.lexeme, klass)
         elif isinstance(stmt, ReturnStmt):
             value = None
             if stmt.value is not None:
@@ -684,11 +711,25 @@ class Parser:
 
     def declaration(self):
         """Parse a declaration."""
+        if self.match("CLASS"):
+            return self.class_declaration()
         if self.match("FUN"):
             return self.function("function")
         if self.match("VAR"):
             return self.var_declaration()
         return self.statement()
+
+    def class_declaration(self):
+        """Parse a class declaration."""
+        name = self.consume("IDENTIFIER", "Expect class name.")
+        self.consume("LEFT_BRACE", "Expect '{' before class body.")
+
+        methods = []
+        while not self.check("RIGHT_BRACE") and not self.is_at_end():
+            methods.append(self.function("method"))
+
+        self.consume("RIGHT_BRACE", "Expect '}' after class body.")
+        return ClassStmt(name, methods)
 
     def function(self, kind):
         """Parse a function declaration."""
