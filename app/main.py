@@ -514,6 +514,9 @@ class Resolver:
             self.define(stmt.name)
 
             if stmt.superclass is not None:
+                # Check if class inherits from itself
+                if stmt.name.lexeme == stmt.superclass.name.lexeme:
+                    self.error(stmt.superclass.name, "A class can't inherit from itself.")
                 self.resolve(stmt.superclass)
 
             self.begin_scope()
