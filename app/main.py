@@ -178,8 +178,9 @@ class FunStmt(Stmt):
 class ClassStmt(Stmt):
     """Class declaration statement."""
 
-    def __init__(self, name, methods):
+    def __init__(self, name, superclass, methods):
         self.name = name
+        self.superclass = superclass
         self.methods = methods
 
 
@@ -348,14 +349,20 @@ class LoxFunction(LoxCallable):
 class LoxClass(LoxCallable):
     """Lox class."""
 
-    def __init__(self, name, methods):
+    def __init__(self, name, superclass, methods):
         self.name = name
+        self.superclass = superclass
         self.methods = methods
 
     def find_method(self, name):
         """Find a method by name."""
         if name in self.methods:
             return self.methods[name]
+        
+        # Look for method in superclass
+        if self.superclass is not None:
+            return self.superclass.find_method(name)
+        
         return None
 
     def call(self, interpreter, arguments):
@@ -505,6 +512,9 @@ class Resolver:
 
             self.declare(stmt.name)
             self.define(stmt.name)
+
+            if stmt.superclass is not None:
+                self.resolve(stmt.superclass)
 
             self.begin_scope()
             self.scopes[-1]["this"] = True
@@ -664,6 +674,14 @@ class Interpreter:
             function = LoxFunction(stmt, self.environment)
             self.environment.define(stmt.name.lexeme, function)
         elif isinstance(stmt, ClassStmt):
+            # Evaluate superclass if present
+            superclass = None
+            if stmt.superclass is not None:
+                superclass = self.evaluate(stmt.superclass)
+                if not isinstance(superclass, LoxClass):
+                    raise LoxRuntimeError(stmt.superclass.name,
+                                         "Superclass must be a class.")
+            
             # Define class name first so methods can reference it
             self.environment.define(stmt.name.lexeme, None)
 
@@ -675,7 +693,7 @@ class Interpreter:
                 methods[method.name.lexeme] = function
 
             # Create the class and update the environment
-            klass = LoxClass(stmt.name.lexeme, methods)
+            klass = LoxClass(stmt.name.lexeme, superclass, methods)
             self.environment.values[stmt.name.lexeme] = klass
         elif isinstance(stmt, ReturnStmt):
             value = None
@@ -894,6 +912,12 @@ class Parser:
     def class_declaration(self):
         """Parse a class declaration."""
         name = self.consume("IDENTIFIER", "Expect class name.")
+        
+        superclass = None
+        if self.match("LESS"):
+            self.consume("IDENTIFIER", "Expect superclass name.")
+            superclass = Variable(self.previous())
+        
         self.consume("LEFT_BRACE", "Expect '{' before class body.")
 
         methods = []
@@ -901,7 +925,7 @@ class Parser:
             methods.append(self.function("method"))
 
         self.consume("RIGHT_BRACE", "Expect '}' after class body.")
-        return ClassStmt(name, methods)
+        return ClassStmt(name, superclass, methods)
 
     def function(self, kind):
         """Parse a function declaration."""
