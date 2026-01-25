@@ -107,6 +107,13 @@ class Set(Expr):
         self.value = value
 
 
+class This(Expr):
+    """This expression."""
+
+    def __init__(self, keyword):
+        self.keyword = keyword
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -449,6 +456,7 @@ class Resolver:
         self.scopes = []  # Stack of scopes
         self.had_error = False
         self.current_function = None
+        self.current_class = None
 
     def resolve(self, item):
         """Resolve a statement, expression, or list of statements."""
@@ -476,10 +484,20 @@ class Resolver:
             self.define(stmt.name)
             self.resolve_function(stmt)
         elif isinstance(stmt, ClassStmt):
+            enclosing_class = self.current_class
+            self.current_class = "class"
+
             self.declare(stmt.name)
             self.define(stmt.name)
+
+            self.begin_scope()
+            self.scopes[-1]["this"] = True
+
             for method in stmt.methods:
                 self.resolve_function(method)
+
+            self.end_scope()
+            self.current_class = enclosing_class
         elif isinstance(stmt, ExpressionStmt):
             self.resolve(stmt.expression)
         elif isinstance(stmt, IfStmt):
@@ -500,7 +518,12 @@ class Resolver:
 
     def resolve_expr(self, expr):
         """Resolve an expression."""
-        if isinstance(expr, Variable):
+        if isinstance(expr, This):
+            if self.current_class is None:
+                self.error(expr.keyword, "Can't use 'this' outside of a class.")
+                return
+            self.resolve_local(expr, expr.keyword)
+        elif isinstance(expr, Variable):
             if self.scopes and self.scopes[-1].get(expr.name.lexeme) is False:
                 self.error(
                     expr.name, "Can't read local variable in its own initializer.")
@@ -654,6 +677,8 @@ class Interpreter:
         """Evaluate an expression and return its value."""
         if isinstance(expr, Literal):
             return expr.value
+        elif isinstance(expr, This):
+            return self.lookup_variable(expr.keyword, expr)
         elif isinstance(expr, Variable):
             return self.lookup_variable(expr.name, expr)
         elif isinstance(expr, Assign):
@@ -1152,6 +1177,8 @@ class Parser:
             return Literal(self.previous().literal)
         if self.match("STRING"):
             return Literal(self.previous().literal)
+        if self.match("THIS"):
+            return This(self.previous())
         if self.match("LEFT_PAREN"):
             expr = self.expression()
             self.consume("RIGHT_PAREN", "Expect ')' after expression.")
