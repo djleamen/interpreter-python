@@ -114,6 +114,14 @@ class This(Expr):
         self.keyword = keyword
 
 
+class Super(Expr):
+    """Super expression."""
+
+    def __init__(self, keyword, method):
+        self.keyword = keyword
+        self.method = method
+
+
 # Statement classes
 class Stmt:
     """Base class for statements."""
@@ -479,7 +487,7 @@ class Resolver:
         self.scopes = []  # Stack of scopes
         self.had_error = False
         self.current_function = None  # None, "function", or "initializer"
-        self.current_class = None
+        self.current_class = None  # None, "class", or "subclass"
 
     def resolve(self, item):
         """Resolve a statement, expression, or list of statements."""
@@ -517,7 +525,12 @@ class Resolver:
                 # Check if class inherits from itself
                 if stmt.name.lexeme == stmt.superclass.name.lexeme:
                     self.error(stmt.superclass.name, "A class can't inherit from itself.")
+                self.current_class = "subclass"
                 self.resolve(stmt.superclass)
+
+                # Create scope for "super"
+                self.begin_scope()
+                self.scopes[-1]["super"] = True
 
             self.begin_scope()
             self.scopes[-1]["this"] = True
@@ -527,6 +540,10 @@ class Resolver:
                 self.resolve_function(method, declaration)
 
             self.end_scope()
+            
+            if stmt.superclass is not None:
+                self.end_scope()
+            
             self.current_class = enclosing_class
         elif isinstance(stmt, ExpressionStmt):
             self.resolve(stmt.expression)
@@ -550,7 +567,14 @@ class Resolver:
 
     def resolve_expr(self, expr):
         """Resolve an expression."""
-        if isinstance(expr, This):
+        if isinstance(expr, Super):
+            if self.current_class is None:
+                self.error(expr.keyword, "Can't use 'super' outside of a class.")
+            elif self.current_class != "subclass":
+                self.error(expr.keyword, "Can't use 'super' in a class with no superclass.")
+            else:
+                self.resolve_local(expr, expr.keyword)
+        elif isinstance(expr, This):
             if self.current_class is None:
                 self.error(expr.keyword, "Can't use 'this' outside of a class.")
                 return
@@ -688,6 +712,11 @@ class Interpreter:
             # Define class name first so methods can reference it
             self.environment.define(stmt.name.lexeme, None)
 
+            # Create environment for "super" if there's a superclass
+            if stmt.superclass is not None:
+                self.environment = Environment(self.environment)
+                self.environment.define("super", superclass)
+
             # Create methods - they capture the current environment
             methods = {}
             for method in stmt.methods:
@@ -697,6 +726,11 @@ class Interpreter:
 
             # Create the class and update the environment
             klass = LoxClass(stmt.name.lexeme, superclass, methods)
+            
+            # Pop the "super" environment if we created one
+            if stmt.superclass is not None:
+                self.environment = self.environment.enclosing
+            
             self.environment.values[stmt.name.lexeme] = klass
         elif isinstance(stmt, ReturnStmt):
             value = None
@@ -718,6 +752,20 @@ class Interpreter:
         """Evaluate an expression and return its value."""
         if isinstance(expr, Literal):
             return expr.value
+        elif isinstance(expr, Super):
+            distance = self.locals.get(id(expr))
+            superclass = self.environment.get_at(distance, "super")
+            
+            # "this" is always one level nearer than "super"
+            obj = self.environment.get_at(distance - 1, "this")
+            
+            method = superclass.find_method(expr.method.lexeme)
+            
+            if method is None:
+                raise LoxRuntimeError(expr.method,
+                                    f"Undefined property '{expr.method.lexeme}'.")
+            
+            return method.bind(obj)
         elif isinstance(expr, This):
             return self.lookup_variable(expr.keyword, expr)
         elif isinstance(expr, Variable):
@@ -1224,6 +1272,11 @@ class Parser:
             return Literal(self.previous().literal)
         if self.match("STRING"):
             return Literal(self.previous().literal)
+        if self.match("SUPER"):
+            keyword = self.previous()
+            self.consume("DOT", "Expect '.' after 'super'.")
+            method = self.consume("IDENTIFIER", "Expect superclass method name.")
+            return Super(keyword, method)
         if self.match("THIS"):
             return This(self.previous())
         if self.match("LEFT_PAREN"):
