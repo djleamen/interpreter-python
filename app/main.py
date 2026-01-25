@@ -277,11 +277,12 @@ class BoundMethod(LoxCallable):
         self.method = method
 
     def call(self, interpreter, arguments):
-        # Create environment for method execution
-        environment = Environment(self.method.closure)
+        # Create environment for "this" (matches class scope during resolution)
+        this_environment = Environment(self.method.closure)
+        this_environment.define("this", self.instance)
 
-        # Define "this" in the method's environment
-        environment.define("this", self.instance)
+        # Create environment for method parameters (nested inside this_environment)
+        environment = Environment(this_environment)
 
         # Bind parameters to arguments
         for i, param in enumerate(self.method.declaration.params):
