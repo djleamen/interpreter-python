@@ -471,7 +471,7 @@ class Resolver:
         self.interpreter = interpreter
         self.scopes = []  # Stack of scopes
         self.had_error = False
-        self.current_function = None
+        self.current_function = None  # None, "function", or "initializer"
         self.current_class = None
 
     def resolve(self, item):
@@ -498,7 +498,7 @@ class Resolver:
         elif isinstance(stmt, FunStmt):
             self.declare(stmt.name)
             self.define(stmt.name)
-            self.resolve_function(stmt)
+            self.resolve_function(stmt, "function")
         elif isinstance(stmt, ClassStmt):
             enclosing_class = self.current_class
             self.current_class = "class"
@@ -510,7 +510,8 @@ class Resolver:
             self.scopes[-1]["this"] = True
 
             for method in stmt.methods:
-                self.resolve_function(method)
+                declaration = "initializer" if method.name.lexeme == "init" else "method"
+                self.resolve_function(method, declaration)
 
             self.end_scope()
             self.current_class = enclosing_class
@@ -527,6 +528,8 @@ class Resolver:
             if self.current_function is None:
                 self.error(stmt.keyword, "Can't return from top-level code.")
             if stmt.value is not None:
+                if self.current_function == "initializer":
+                    self.error(stmt.keyword, "Can't return a value from an initializer.")
                 self.resolve(stmt.value)
         elif isinstance(stmt, WhileStmt):
             self.resolve(stmt.condition)
@@ -569,10 +572,10 @@ class Resolver:
         elif isinstance(expr, Unary):
             self.resolve(expr.right)
 
-    def resolve_function(self, function):
+    def resolve_function(self, function, function_type="function"):
         """Resolve a function declaration."""
         enclosing_function = self.current_function
-        self.current_function = "function"
+        self.current_function = function_type
 
         self.begin_scope()
         for param in function.params:
