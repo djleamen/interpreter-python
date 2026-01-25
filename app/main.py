@@ -293,8 +293,14 @@ class BoundMethod(LoxCallable):
             interpreter.execute_block(
                 self.method.declaration.body, environment)
         except Return as return_value:
+            # Initializers always return 'this', even with explicit return
+            if self.method.is_initializer:
+                return self.instance
             return return_value.value
 
+        # Initializers return 'this' by default
+        if self.method.is_initializer:
+            return self.instance
         return None
 
     def arity(self):
@@ -355,10 +361,19 @@ class LoxClass(LoxCallable):
     def call(self, interpreter, arguments):
         """Instantiate the class."""
         instance = LoxInstance(self)
+        
+        # Call init method if it exists
+        initializer = self.find_method("init")
+        if initializer is not None:
+            initializer.bind(instance).call(interpreter, arguments)
+        
         return instance
 
     def arity(self):
-        """Classes take no arguments for now."""
+        """Return the arity of the init method if it exists."""
+        initializer = self.find_method("init")
+        if initializer is not None:
+            return initializer.arity()
         return 0
 
     def __str__(self):
@@ -652,7 +667,8 @@ class Interpreter:
             # Create methods - they capture the current environment
             methods = {}
             for method in stmt.methods:
-                function = LoxFunction(method, self.environment)
+                is_initializer = method.name.lexeme == "init"
+                function = LoxFunction(method, self.environment, is_initializer)
                 methods[method.name.lexeme] = function
 
             # Create the class and update the environment
