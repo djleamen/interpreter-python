@@ -125,10 +125,13 @@ class Interpreter:
         elif isinstance(expr, Assign):
             value = self.evaluate(expr.value)
             distance = self.locals.get(id(expr))
-            if distance is not None:
-                self.environment.assign_at(distance, expr.name.lexeme, value)
-            else:
-                self.globals.assign(expr.name.lexeme, value)
+            try:
+                if distance is not None:
+                    self.environment.assign_at(distance, expr.name.lexeme, value)
+                else:
+                    self.globals.assign(expr.name.lexeme, value)
+            except RuntimeError as e:
+                raise LoxRuntimeError(expr.name, str(e))
             return value
         elif isinstance(expr, Grouping):
             return self.evaluate(expr.expression)
@@ -266,9 +269,12 @@ class Interpreter:
         """Look up a variable using resolved depth if available."""
         distance = self.locals.get(id(expr))
         if distance is not None:
-            return self.environment.get_at(distance, name.lexeme)
+            try:
+                return self.environment.get_at(distance, name.lexeme)
+            except RuntimeError as e:
+                raise LoxRuntimeError(name, str(e))
         else:
             try:
                 return self.globals.get(name.lexeme)
-            except LoxRuntimeError as e:
-                raise e
+            except RuntimeError as e:
+                raise LoxRuntimeError(name, str(e))

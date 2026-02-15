@@ -1,0 +1,5 @@
+{
+  var Dinosaur = "exists";
+  print "Inside block: " + Dinosaur;
+}
+print Dinosaur;
