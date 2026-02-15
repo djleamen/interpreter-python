@@ -3,7 +3,6 @@
 
 class ParseException(Exception):
     """Exception raised during parsing."""
-    pass
 
 
 class LoxRuntimeError(Exception):

@@ -1,6 +1,6 @@
 """AST Printer for the Lox interpreter."""
 
-from .expr import Literal, Binary, Unary, Grouping
+from .expr import Literal, Binary, Unary, Grouping # pylint: disable=relative-beyond-top-level
 
 
 class AstPrinter:

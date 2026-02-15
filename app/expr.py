@@ -3,7 +3,6 @@
 
 class Expr:
     """Base class for expressions."""
-    pass
 
 
 class Literal(Expr):

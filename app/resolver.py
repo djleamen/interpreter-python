@@ -1,11 +1,11 @@
 """Resolver for compile-time identifier resolution in the Lox interpreter."""
 
 import sys
-from .stmt import (
+from .stmt import (  # pylint: disable=relative-beyond-top-level
     Stmt, BlockStmt, VarStmt, FunStmt, ClassStmt, ExpressionStmt,
     IfStmt, PrintStmt, ReturnStmt, WhileStmt
 )
-from .expr import (
+from .expr import (  # pylint: disable=relative-beyond-top-level
     Expr, Super, This, Variable, Assign, Binary, Call, Get, Set,
     Grouping, Literal, Logical, Unary
 )
@@ -56,7 +56,8 @@ class Resolver:
             if stmt.superclass is not None:
                 # Check if class inherits from itself
                 if stmt.name.lexeme == stmt.superclass.name.lexeme:
-                    self.error(stmt.superclass.name, "A class can't inherit from itself.")
+                    self.error(stmt.superclass.name,
+                               "A class can't inherit from itself.")
                 self.current_class = "subclass"
                 self.resolve(stmt.superclass)
 
@@ -72,10 +73,10 @@ class Resolver:
                 self.resolve_function(method, declaration)
 
             self.end_scope()
-            
+
             if stmt.superclass is not None:
                 self.end_scope()
-            
+
             self.current_class = enclosing_class
         elif isinstance(stmt, ExpressionStmt):
             self.resolve(stmt.expression)
@@ -91,7 +92,8 @@ class Resolver:
                 self.error(stmt.keyword, "Can't return from top-level code.")
             if stmt.value is not None:
                 if self.current_function == "initializer":
-                    self.error(stmt.keyword, "Can't return a value from an initializer.")
+                    self.error(
+                        stmt.keyword, "Can't return a value from an initializer.")
                 self.resolve(stmt.value)
         elif isinstance(stmt, WhileStmt):
             self.resolve(stmt.condition)
@@ -101,14 +103,17 @@ class Resolver:
         """Resolve an expression."""
         if isinstance(expr, Super):
             if self.current_class is None:
-                self.error(expr.keyword, "Can't use 'super' outside of a class.")
+                self.error(
+                    expr.keyword, "Can't use 'super' outside of a class.")
             elif self.current_class != "subclass":
-                self.error(expr.keyword, "Can't use 'super' in a class with no superclass.")
+                self.error(
+                    expr.keyword, "Can't use 'super' in a class with no superclass.")
             else:
                 self.resolve_local(expr, expr.keyword)
         elif isinstance(expr, This):
             if self.current_class is None:
-                self.error(expr.keyword, "Can't use 'this' outside of a class.")
+                self.error(
+                    expr.keyword, "Can't use 'this' outside of a class.")
                 return
             self.resolve_local(expr, expr.keyword)
         elif isinstance(expr, Variable):

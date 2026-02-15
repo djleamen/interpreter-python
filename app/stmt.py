@@ -3,7 +3,6 @@
 
 class Stmt:
     """Base class for statements."""
-    pass
 
 
 class PrintStmt(Stmt):

@@ -1,8 +1,8 @@
 """Callable classes for the Lox interpreter."""
 
 import time
-from .environment import Environment
-from .exceptions import Return, LoxRuntimeError
+from .environment import Environment  # pylint: disable=relative-beyond-top-level
+from .exceptions import Return, LoxRuntimeError  # pylint: disable=relative-beyond-top-level
 
 
 class LoxCallable:
@@ -115,20 +115,20 @@ class LoxClass(LoxCallable):
         """Find a method by name."""
         if name in self.methods:
             return self.methods[name]
-        
+
         if self.superclass is not None:
             return self.superclass.find_method(name)
-        
+
         return None
 
     def call(self, interpreter, arguments):
         """Instantiate the class."""
         instance = LoxInstance(self)
-        
+
         initializer = self.find_method("init")
         if initializer is not None:
             initializer.bind(instance).call(interpreter, arguments)
-        
+
         return instance
 
     def arity(self):
@@ -153,7 +153,6 @@ class LoxInstance:
         """Get a property from the instance."""
         if name.lexeme in self.fields:
             return self.fields[name.lexeme]
-
 
         method = self.klass.find_method(name.lexeme)
         if method is not None:

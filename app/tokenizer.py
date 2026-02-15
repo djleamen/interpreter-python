@@ -1,7 +1,7 @@
 """Tokenizer for the Lox language."""
 
 import sys
-from .token import Token
+from .token import Token # pylint: disable=relative-beyond-top-level
 
 
 def tokenize(file_contents):

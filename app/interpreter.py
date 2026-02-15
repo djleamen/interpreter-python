@@ -1,13 +1,14 @@
 """Interpreter for the Lox language."""
 
-from .environment import Environment
-from .callable import ClockNative, LoxCallable, LoxFunction, LoxClass, LoxInstance
-from .exceptions import LoxRuntimeError, Return
-from .stmt import (
+from typing import Dict
+from .environment import Environment  # pylint: disable=relative-beyond-top-level
+from .callable import ClockNative, LoxCallable, LoxFunction, LoxClass, LoxInstance  # pylint: disable=relative-beyond-top-level
+from .exceptions import LoxRuntimeError, Return  # pylint: disable=relative-beyond-top-level
+from .stmt import (  # pylint: disable=relative-beyond-top-level
     PrintStmt, ExpressionStmt, VarStmt, BlockStmt, IfStmt,
     WhileStmt, FunStmt, ClassStmt, ReturnStmt
 )
-from .expr import (
+from .expr import (  # pylint: disable=relative-beyond-top-level
     Literal, Super, This, Variable, Assign, Grouping, Logical,
     Unary, Binary, Call, Get, Set
 )
@@ -17,10 +18,10 @@ class Interpreter:
     """Class to evaluate expressions."""
 
     def __init__(self):
-        self.globals = Environment()
-        self.environment = self.globals
+        self.globals: Environment = Environment()
+        self.environment: Environment = self.globals
         self.globals.define("clock", ClockNative())
-        self.locals = {}  # Maps expressions to their resolved depths
+        self.locals: Dict[int, int] = {}  # Maps expressions to their resolved depths
 
     def resolve(self, expr, depth):
         """Store the resolved depth for an expression."""
@@ -57,8 +58,8 @@ class Interpreter:
                 superclass = self.evaluate(stmt.superclass)
                 if not isinstance(superclass, LoxClass):
                     raise LoxRuntimeError(stmt.superclass.name,
-                                         "Superclass must be a class.")
-            
+                                          "Superclass must be a class.")
+
             self.environment.define(stmt.name.lexeme, None)
 
             if stmt.superclass is not None:
@@ -69,14 +70,17 @@ class Interpreter:
             methods = {}
             for method in stmt.methods:
                 is_initializer = method.name.lexeme == "init"
-                function = LoxFunction(method, self.environment, is_initializer)
+                function = LoxFunction(
+                    method, self.environment, is_initializer)
                 methods[method.name.lexeme] = function
 
             klass = LoxClass(stmt.name.lexeme, superclass, methods)
-            
+
             if stmt.superclass is not None:
-                self.environment = self.environment.enclosing
-            
+                enclosing = self.environment.enclosing
+                if enclosing is not None:
+                    self.environment = enclosing
+
             self.environment.values[stmt.name.lexeme] = klass
         elif isinstance(stmt, ReturnStmt):
             value = None
@@ -100,17 +104,19 @@ class Interpreter:
             return expr.value
         elif isinstance(expr, Super):
             distance = self.locals.get(id(expr))
+            if distance is None:
+                raise LoxRuntimeError(expr.method, "Could not resolve super.")
             superclass = self.environment.get_at(distance, "super")
-            
+
             # "this" is always one level nearer than "super"
             obj = self.environment.get_at(distance - 1, "this")
-            
+
             method = superclass.find_method(expr.method.lexeme)
-            
+
             if method is None:
                 raise LoxRuntimeError(expr.method,
-                                    f"Undefined property '{expr.method.lexeme}'.")
-            
+                                      f"Undefined property '{expr.method.lexeme}'.")
+
             return method.bind(obj)
         elif isinstance(expr, This):
             return self.lookup_variable(expr.keyword, expr)
@@ -264,5 +270,5 @@ class Interpreter:
         else:
             try:
                 return self.globals.get(name.lexeme)
-            except RuntimeError as e:
-                raise LoxRuntimeError(name, str(e)) from e
+            except LoxRuntimeError as e:
+                raise e

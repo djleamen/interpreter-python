@@ -4,12 +4,12 @@ From CodeCrafters.io build-your-own-interpreter (Python)
 """
 
 import sys
-from .tokenizer import tokenize
-from .parser import Parser
-from .ast_printer import AstPrinter
-from .interpreter import Interpreter
-from .resolver import Resolver
-from .exceptions import LoxRuntimeError
+from .tokenizer import tokenize # pylint: disable=relative-beyond-top-level
+from .parser import Parser # pylint: disable=relative-beyond-top-level, deprecated-module
+from .ast_printer import AstPrinter # pylint: disable=relative-beyond-top-level
+from .interpreter import Interpreter # pylint: disable=relative-beyond-top-level
+from .resolver import Resolver # pylint: disable=relative-beyond-top-level
+from .exceptions import LoxRuntimeError # pylint: disable=relative-beyond-top-level
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
         print(f"Unknown command: {command}", file=sys.stderr)
         exit(1)
 
-    with open(filename) as file:
+    with open(filename, encoding="utf-8") as file:
         file_contents = file.read()
 
     if command == "tokenize":

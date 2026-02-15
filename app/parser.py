@@ -1,13 +1,12 @@
 """Parser for the Lox language."""
 
 import sys
-from .token import Token
-from .exceptions import ParseException
-from .expr import (
-    Expr, Literal, Binary, Unary, Grouping, Variable, Assign,
+from .exceptions import ParseException  # pylint: disable=relative-beyond-top-level
+from .expr import (  # pylint: disable=relative-beyond-top-level
+    Literal, Binary, Unary, Grouping, Variable, Assign,
     Logical, Call, Get, Set, This, Super
 )
-from .stmt import (
+from .stmt import (  # pylint: disable=relative-beyond-top-level
     PrintStmt, ExpressionStmt, VarStmt, BlockStmt, IfStmt,
     WhileStmt, FunStmt, ClassStmt, ReturnStmt
 )
@@ -53,12 +52,12 @@ class Parser:
     def class_declaration(self):
         """Parse a class declaration."""
         name = self.consume("IDENTIFIER", "Expect class name.")
-        
+
         superclass = None
         if self.match("LESS"):
             self.consume("IDENTIFIER", "Expect superclass name.")
             superclass = Variable(self.previous())
-        
+
         self.consume("LEFT_BRACE", "Expect '{' before class body.")
 
         methods = []
@@ -365,7 +364,8 @@ class Parser:
         if self.match("SUPER"):
             keyword = self.previous()
             self.consume("DOT", "Expect '.' after 'super'.")
-            method = self.consume("IDENTIFIER", "Expect superclass method name.")
+            method = self.consume(
+                "IDENTIFIER", "Expect superclass method name.")
             return Super(keyword, method)
         if self.match("THIS"):
             return This(self.previous())
