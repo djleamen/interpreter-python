@@ -172,7 +172,7 @@ class Interpreter:
                 self.check_number_operands(expr.operator, left, right)
                 if right == 0:
                     # Match Lox's IEEE 754 semantics instead of crashing
-                    if left == 0:
+                    if left == 0 or math.isnan(left):
                         return float("nan")
                     return math.copysign(float("inf"), left)
                 return left / right
