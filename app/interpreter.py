@@ -1,5 +1,6 @@
 """Interpreter for the Lox language."""
 
+import math
 from typing import Dict
 from .environment import Environment  # pylint: disable=relative-beyond-top-level
 from .callable import ClockNative, LoxCallable, LoxFunction, LoxClass, LoxInstance  # pylint: disable=relative-beyond-top-level
@@ -169,6 +170,11 @@ class Interpreter:
                     expr.operator, "Operands must be two numbers or two strings.")
             elif expr.operator.type == "SLASH":
                 self.check_number_operands(expr.operator, left, right)
+                if right == 0:
+                    # Match Lox's IEEE 754 semantics instead of crashing
+                    if left == 0 or math.isnan(left):
+                        return float("nan")
+                    return math.copysign(float("inf"), left)
                 return left / right
             elif expr.operator.type == "STAR":
                 self.check_number_operands(expr.operator, left, right)
@@ -237,6 +243,10 @@ class Interpreter:
             return True
         if a is None:
             return False
+        # Values of different types are never equal in Lox
+        # (avoid Python's bool/number cross-type equality)
+        if isinstance(a, bool) or isinstance(b, bool):
+            return isinstance(a, bool) and isinstance(b, bool) and a == b
         return a == b
 
     def stringify(self, value):
@@ -246,6 +256,10 @@ class Interpreter:
         if isinstance(value, bool):
             return "true" if value else "false"
         if isinstance(value, float):
+            if math.isnan(value):
+                return "NaN"
+            if math.isinf(value):
+                return "Infinity" if value > 0 else "-Infinity"
             text = str(value)
             # Remove .0 suffix for whole numbers
             if text.endswith(".0"):
